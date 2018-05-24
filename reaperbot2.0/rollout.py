@@ -26,7 +26,7 @@ class RolloutBot(sc2.BotAI):
         self.seed = weights
         self.reaperlasttarget = {}
         self.reaperlasttargethealth = {}
-        
+
     async def on_step(self, iteration):
         if iteration == 0:
             if iteration == 0:
@@ -90,7 +90,8 @@ class RolloutBot(sc2.BotAI):
                 err = await self.do(bobthebuilder.build(REFINERY, target))
                 if not err:
                     self.refinerys += 1
-        
+		
+#refinery code copied from examples on python-sc2
         for a in self.units(REFINERY):
             if a.assigned_harvesters < a.ideal_harvesters:
                 w = self.workers.closer_than(20, a)
