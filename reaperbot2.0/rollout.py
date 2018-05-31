@@ -8,7 +8,7 @@ from sc2.constants import *
 from sc2 import run_game, maps, Race, Difficulty
 from sc2.player import Bot, Computer
 from sc2.helpers import ControlGroup
-weight = [1,2,3]
+weight = [1,1,1]
     
 
 class RolloutBot(sc2.BotAI):
@@ -22,32 +22,52 @@ class RolloutBot(sc2.BotAI):
         self.enemy_health = {}
         self.reapergenes = defaultdict(list)
         self.reaperrewards = {}
-        self.reaper_indexer = {}
-        self.seed = weights
+        self.reaperindexer = {}
+        self.weights = weights
         self.reaperlasttarget = {}
         self.reaperlasttargethealth = {}
-
+        self.popmaker = 0
+        
     async def on_step(self, iteration):
         if iteration == 0:
             if iteration == 0:
                 await self.chat_send("(glhf)")
 
 #for selecting our Units
-
+        
         if self.units(REAPER).idle.amount > 10:
             for reaper in self.units(REAPER).idle:
-                #mutate reaper genes
-                if(not self.reaperrewards):
-                    self.seed[0] = weights[0]*(random.randint(1,200)/100)
-                    self.seed[1] = weights[1]*(random.randint(1,200)/100)
-                    self.seed[2] = weights[2]*(random.randint(1,200)/100)
-                    self.reapergenes[reaper.tag] = self.seed
+                #MAking the initial population for the first 10 reapers
+                if reaper.tag in self.reapergenes:
+                    print("already done")
                 else:
-                    for guy in reaperrewards
-                    self.seed[0] = weights[0]*(random.randint(1,200)/100)
-                    self.seed[1] = weights[1]*(random.randint(1,200)/100)
-                    self.seed[2] = weights[2]*(random.randint(1,200)/100)
-                    self.reapergenes[reaper.tag] = self.seed
+                    if len(self.reaperrewards.values()) > 2:
+                        print(self.reaperrewards)
+                        pick = random.randint(1,3)
+                        v = list(self.reaperrewards.values())
+                        k = list(self.reaperrewards.keys())
+                        for i in range(3):
+                            if(i == pick):
+                                self.reapergenes[reaper.tag] = self.reapergenes[k[v.index(max(v))]]
+                                if random.randint(1,100)/100 <= .50:
+                                    #mutate
+                                    pick = random.randint(0,2)
+                                    if(random.randint(1,2) == 1):
+                                        self.reapergenes[reaper.tag][pick] -= .02
+                                    else:
+                                        self.reapergenes[reaper.tag][pick] += .02
+                    else: #since there are no rewarded reapers
+                        seed = [0,0,0]
+                        seed[0] = (random.randint(1,100)/100)
+                        seed[1] = (random.randint(1,100)/100)
+                        seed[2] = (random.randint(1,100)/100)
+                        self.reapergenes[reaper.tag] = seed
+                    
+
+                                
+                        #del v[v.index(max(v))]
+        
+        
                     
             cg = ControlGroup(self.units(REAPER).idle)
             self.attack_groups.add(cg)
@@ -90,8 +110,7 @@ class RolloutBot(sc2.BotAI):
                 err = await self.do(bobthebuilder.build(REFINERY, target))
                 if not err:
                     self.refinerys += 1
-		
-#refinery code copied from examples on python-sc2
+        
         for a in self.units(REFINERY):
             if a.assigned_harvesters < a.ideal_harvesters:
                 w = self.workers.closer_than(20, a)
@@ -107,7 +126,7 @@ class RolloutBot(sc2.BotAI):
             #weight for 
         #
         #
-                    
+        barracks = self.units(BARRACKS).ready            
         for ac in list(self.attack_groups):
             alive_units = ac.select_units(self.units)
             total_x = []
@@ -115,6 +134,10 @@ class RolloutBot(sc2.BotAI):
             total_z = []
             if alive_units.amount > 5:
                 for reaper in ac.select_units(self.units):
+                
+                    if reaper.tag in self.reaperrewards:
+                        print(self.reaperrewards[reaper.tag])
+                        
                     ting = 10
                     targets = self.known_enemy_units.prefer_close_to(reaper)
                     self.enemyreward = {}
@@ -122,41 +145,51 @@ class RolloutBot(sc2.BotAI):
                     for enemy in targets:
                         if ting == 0:
                             break
+                        
                         self.enemyindexer[enemy.tag] = enemy
-                        #the negative 1 gives more reward for enemies that are easily killed by your team
-                        self.enemyreward[enemy.tag] = -1*(enemy.health-alive_units.amount*8)*self.reapergenes[reaper.tag][1]
+                        #the negative 1 gives more reward for enemies that are easily killed by your team/
+                        if reaper.tag in self.reapergenes:
+                            self.enemyreward[enemy.tag] = -1*(enemy.health-alive_units.amount*8)*self.reapergenes[reaper.tag][1]
                         #since they are already in order of closeness we can add a value for being closest
                         #and decrement it each time to give different rewards
-                        self.enemyreward[enemy.tag] += self.reapergenes[reaper.tag][2]*(ting)
+                            self.enemyreward[enemy.tag] += self.reapergenes[reaper.tag][2]*(ting)
                         
                         ting -= 1
                 
-                if(targets.exists):
+                
+                if len(self.enemyreward.values()) > 0:
                     v = list(self.enemyreward.values())
                     k = list(self.enemyreward.keys())
-                    target = self.enemyindexer[k[v.index(max(v))]]
+                    
+                    selectedtarget = self.enemyindexer[k[v.index(max(v))]]
+                    target = selectedtarget.position
                 else:
+                    enemystart = 1
                     target = self.enemy_start_locations[0]
                     
                 for reaper in ac.select_units(self.units):
-                    if(reaper.tag in self.reaper_health):
-                        if  reaper.health < self.reaper_health[reaper.tag]:                
-                            await self.do(reaper.move(reaper.position.towards(target.position, self.reapergenes[reaper.tag][2]*-5)))
-                        elif  reaper.health < reaper.health_max:
+                    if reaper.tag in self.reaper_health and reaper.tag in self.reapergenes:
+                        if  reaper.health < self.reaper_health[reaper.tag]:
+                            await self.do(reaper.move(reaper.position.towards(target, self.reapergenes[reaper.tag][2]*-5)))
+                        elif reaper.health < reaper.health_max:
                             await self.do(reaper.move(barracks.random.position))
                         elif reaper.is_idle:
                             await self.do(reaper.attack(target))
                             
-                    reaperrewards[reaper.tag] = 100 - (self.reaper_health[reaper.tag] - reaper.health)
+                    if reaper.tag in self.reaper_health:        
+                        self.reaperrewards[reaper.tag] = 60 - (self.reaper_health[reaper.tag] - reaper.health)
+                    
                     if reaper.tag in self.reaperlasttarget:
-                        if not self.reaperlasttarget[reaper.tag].exists:
-                            reaperrewards[reaper.tag] += 100
-                        elif self.reaperlasttarget[reaper.tag].health < self.reaperlasttargethealth[reaper.tag]:
-                            reaperrewards[reaper.tag] += .1*self.reaperlasttargethealth[reaper.tag] - self.reaperlasttarget[reaper.tag].health
+                        if not self.reaperlasttarget[reaper.tag].health > 0:
+                            self.reaperrewards[reaper.tag] += 100
+                            del self.reaperlasttarget[reaper.tag]
                             
-                    self.reaperlasttarget[reaper.tag] = target
-                    self.reaperlasttargethealth[reaper.tag] = target.health
-                    self.reaper_health[reaper.tag] = reaper.health
+                        elif self.reaperlasttarget[reaper.tag].health < self.reaperlasttargethealth[reaper.tag]:
+                            self.reaperrewards[reaper.tag] += .1*(self.reaperlasttargethealth[reaper.tag] - self.reaperlasttarget[reaper.tag].health)
+                    if len(self.enemyreward.values()) > 0:    
+                        self.reaperlasttarget[reaper.tag] = selectedtarget
+                        self.reaperlasttargethealth[reaper.tag] = selectedtarget.health
+                        self.reaper_health[reaper.tag] = reaper.health
             else:
                 for reaper in ac.select_units(self.units):
                     await self.do(reaper.move(cc.position))
@@ -165,6 +198,6 @@ class RolloutBot(sc2.BotAI):
         
         
 run_game(maps.get("Simple64"), [
-	Bot(Race.Terran, RolloutBot([1,2,3])),
+	Bot(Race.Terran, RolloutBot([1,1,1])),
 	Computer(Race.Zerg, Difficulty.Medium)
-], realtime=False)
+], realtime=False, save_replay_as="GeneticBot1.SC2Replay")
